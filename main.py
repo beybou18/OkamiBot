@@ -1,12 +1,10 @@
-import os
-import discord
-import logging
+import os, discord, logging
 from discord.ext import commands, tasks
 from flask import Flask
 from threading import Thread
 from tinydb import TinyDB, Query
 
-# ------------------ CONFIG ------------------ #
+# ---------- Config ----------
 TOKEN = os.getenv("DISCORD_TOKEN")
 ROLE_TIERS = {
     500: 710975465678045226,
@@ -21,16 +19,16 @@ CLASSEMENT_CHANNEL = 711250866581274624
 ANNOUNCE_CHANNEL_ID = 706503185266769993
 DB_FILE = "points_db.json"
 
-# ------------------ LOGGING ------------------ #
+# ---------- Logging ----------
 logging.basicConfig(level=logging.INFO, filename="bot_logs.txt",
                     format="%(asctime)s - %(levelname)s - %(message)s")
 
-# ------------------ FLASK KEEP-ALIVE ------------------ #
-app = Flask("")
+# ---------- Serveur Flask pour Replit ----------
+app = Flask(__name__)
 
-@app.route("/")
+@app.get("/")
 def home():
-    return "Bot Okami actif !"
+    return "Bot is alive!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 8080))
@@ -41,14 +39,15 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# ------------------ INTENTS DISCORD ------------------ #
+# ---------- Intents Discord ----------
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
 intents.message_content = True
+intents.voice_states = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ------------------ BASE DE DONNÉES ------------------ #
+# ---------- Base de données ----------
 db = TinyDB(DB_FILE)
 users_table = db.table("users")
 
@@ -74,14 +73,14 @@ def set_points(uid, amount, name=None):
     users_table.upsert({"id": uid, "points": amount, "name": name or "Inconnu"}, Query().id == uid)
     logging.info(f"Points de {name or uid} réglés à {amount}.")
 
-# ------------------ EVENTS ------------------ #
+# ---------- Démarrage ----------
 @bot.event
 async def on_ready():
     if not award_points.is_running():
         award_points.start()
     print(f"✅ Connecté en tant que {bot.user} ({bot.user.id})")
 
-# ------------------ TÂCHE RÉPÉTITIVE ------------------ #
+# ---------- Boucle : 1 point/min si ≥2 humains ----------
 @tasks.loop(minutes=1)
 async def award_points():
     changed = False
@@ -111,7 +110,7 @@ async def award_points():
     if changed:
         await update_classement()
 
-# ------------------ CLASSEMENT ------------------ #
+# ---------- Classement embed ----------
 async def update_classement():
     for guild in bot.guilds:
         channel = guild.get_channel(CLASSEMENT_CHANNEL)
@@ -149,7 +148,7 @@ async def update_classement():
                 return
         await channel.send(embed=embed)
 
-# ------------------ COMMANDES ------------------ #
+# ---------- Commandes ----------
 @bot.command()
 @commands.cooldown(1, 30, commands.BucketType.user)
 async def points(ctx, member: discord.Member | None = None):
@@ -215,13 +214,11 @@ async def aide(ctx):
 @bot.command()
 async def top(ctx):
     await update_classement()
-    channel = ctx.guild.get_channel(CLASSEMENT_CHANNEL)
-    if channel:
-        await ctx.send(f"📜 Le classement pyramide a été mis à jour dans {channel.mention}.")
+    await ctx.send(f"📜 Le classement pyramide a été mis à jour dans {ctx.guild.get_channel(CLASSEMENT_CHANNEL).mention}.")
 
-# ------------------ LANCEMENT ------------------ #
+# ---------- Lancement ----------
 if not TOKEN:
     raise RuntimeError("Le token Discord est manquant.")
 
-keep_alive()
-bot.run(TOKEN)
+keep_alive()  # Démarre le serveur Flask
+bot.run(TOKEN)  # Démarre le bot Discord
