@@ -3,6 +3,7 @@ from discord.ext import commands, tasks
 from flask import Flask
 from threading import Thread
 from tinydb import TinyDB, Query
+import asyncio
 
 # ---------- Config ----------
 TOKEN = os.getenv("DISCORD_TOKEN")
@@ -23,7 +24,7 @@ DB_FILE = "points_db.json"
 logging.basicConfig(level=logging.INFO, filename="bot_logs.txt",
                     format="%(asctime)s - %(levelname)s - %(message)s")
 
-# ---------- Serveur Flask pour Replit ----------
+# ---------- Serveur Flask pour Render ----------
 app = Flask(__name__)
 
 @app.get("/")
@@ -78,7 +79,7 @@ def set_points(uid, amount, name=None):
 async def on_ready():
     if not award_points.is_running():
         award_points.start()
-    print(f"✅ Connecté en tant que {bot.user} ({bot.user.id})")
+    logging.info(f"✅ Connecté en tant que {bot.user} ({bot.user.id})")
 
 # ---------- Boucle : 1 point/min si ≥2 humains ----------
 @tasks.loop(minutes=1)
@@ -216,9 +217,12 @@ async def top(ctx):
     await update_classement()
     await ctx.send(f"📜 Le classement pyramide a été mis à jour dans {ctx.guild.get_channel(CLASSEMENT_CHANNEL).mention}.")
 
-# ---------- Lancement ----------
+# ---------- Lancement sécurisé ----------
 if not TOKEN:
     raise RuntimeError("Le token Discord est manquant.")
 
-keep_alive()  # Démarre le serveur Flask
-bot.run(TOKEN)  # Démarre le bot Discord
+keep_alive()  # Démarre Flask
+try:
+    bot.run(TOKEN)
+except Exception as e:
+    logging.error(f"Bot arrêté avec erreur : {e}")
