@@ -31,7 +31,7 @@ def home():
     return "Bot is alive!"
 
 def run_flask():
-    port = int(os.environ["PORT"])  # Utilise le port fourni par Render
+    port = int(os.environ.get("PORT", 5000))  # Render fournit un PORT
     app.run(host="0.0.0.0", port=port)
 
 # ---------- Discord ----------
@@ -75,6 +75,7 @@ async def on_ready():
         award_points.start()
     logging.info(f"✅ Connecté en tant que {bot.user} ({bot.user.id})")
 
+# ---------- Boucle de points ----------
 @tasks.loop(minutes=1)
 async def award_points():
     changed = False
@@ -137,12 +138,16 @@ async def update_classement():
         await channel.send(embed=embed)
 
 # ---------- Commandes ----------
-# ... (garde tes commandes inchangées) ...
+# Ajoute ici toutes tes commandes Discord existantes
+# Exemple:
+# @bot.command()
+# async def ping(ctx):
+#     await ctx.send("Pong!")
 
-# ---------- Lancement ----------
+# ---------- Vérification du token ----------
 if not TOKEN:
     raise RuntimeError("Le token Discord est manquant.")
 
-# Flask en thread
-Thread(target=run_flask).start()
+# ---------- Lancement Flask et Discord ----------
+Thread(target=run_flask).start()  # Flask en arrière-plan
 bot.run(TOKEN)
